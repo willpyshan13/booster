@@ -1,5 +1,6 @@
 package com.didiglobal.booster.transform.lint.graph
 
+import java.io.PrintWriter
 import java.util.Objects
 
 /**
@@ -7,7 +8,28 @@ import java.util.Objects
  *
  * @author johnsonlee
  */
-class CallGraph private constructor(val edges: Map<Node, Set<Node>>) : Iterable<CallGraph.Edge> {
+class CallGraph private constructor(private val edges: Map<Node, Set<Node>>, val title: String = "") : Iterable<CallGraph.Edge> {
+
+    companion object {
+        /**
+         * A virtual root node of call graph
+         */
+        val ROOT = Node("*", "*", "*")
+    }
+
+    val nodes: Collection<Node>
+        get() = this.map {
+            listOf(it.from, it.to)
+        }.flatten().toSet()
+
+    operator fun get(node: Node): Set<Node> = edges[node] ?: emptySet()
+
+    /**
+     * Print this call graph
+     */
+    fun print(out: PrintWriter = PrintWriter(System.out, true), transform: (CallGraph) -> CharSequence) {
+        out.println(transform(this))
+    }
 
     override fun iterator(): Iterator<Edge> {
         return edges.map { pair ->
@@ -19,91 +41,91 @@ class CallGraph private constructor(val edges: Map<Node, Set<Node>>) : Iterable<
 
     class Node(val type: String, val name: String, val desc: String) {
 
-        override fun equals(other: Any?): Boolean {
-            if (this === other) {
-                return true
-            }
-
-            if (other !is Node) {
-                return false
-            }
-
-            return type == other.type && name == other.name && desc == other.desc
+        override fun equals(other: Any?) = when {
+            other === this -> true
+            other is Node -> other.type == this.type && other.name == this.name && other.desc == this.desc
+            else -> false
         }
 
-        override fun hashCode(): Int {
-            return Objects.hash(type, name, desc)
-        }
+        override fun hashCode() = Objects.hash(type, name, desc)
 
-        override fun toString(): String {
-            return "$type.$name$desc"
-        }
+        override fun toString() = "$type.$name$desc"
 
         companion object {
-            fun from(s: String): Node {
-                val lbrace = s.lastIndexOf('(')
-                val dot = s.lastIndexOf('.', lbrace)
-                if (lbrace < 0 || dot < 0) {
+
+            fun valueOf(s: String): Node {
+                val lp = s.lastIndexOf('(')
+                val dot = s.lastIndexOf('.', lp)
+                if (lp < 0 || dot < 0) {
                     throw IllegalArgumentException(s)
                 }
-                return Node(s.substring(0, dot), s.substring(dot + 1, lbrace), s.substring(lbrace))
+                return Node(s.substring(0, dot), s.substring(dot + 1, lp), s.substring(lp))
             }
+
         }
     }
 
     class Edge(val from: Node, val to: Node) {
 
-        override fun hashCode(): Int {
-            return Objects.hash(from, to)
+        override fun hashCode() = Objects.hash(from, to)
+
+        override fun equals(other: Any?) = when {
+            other === this -> true
+            other is Edge -> other.from == this.from && other.to == this.to
+            else -> false
         }
 
-        override fun equals(other: Any?): Boolean {
-            if (this === other) {
-                return true
-            }
+        override fun toString() = "$from -> $to"
 
-            if (other !is Edge) {
-                return false
-            }
-
-            return from == other.from && to == other.to
-        }
-
-        override fun toString(): String {
-            return "$from -> $to"
-        }
     }
 
     class Builder {
 
         private val edges = mutableMapOf<Node, MutableSet<Node>>()
 
-        fun addEdge(edge: Edge): Builder {
-            this.edges.getOrPut(edge.from) {
-                mutableSetOf()
-            }.add(edge.to)
-            return this
+        private var title = ""
+
+        fun getTitle() = title
+
+        fun setTitle(title: String) = this.also {
+            this.title = title
         }
 
-        fun hasEdge(edge: Edge): Boolean {
-            return this.hasEdge(edge.from, edge.to)
+        fun addEdges(vararg edges: Edge) = this.also {
+            edges.forEach {
+                addEdge(it.from, it.to)
+            }
         }
 
-        fun hasEdge(from: Node, to: Node): Boolean {
-            return this.edges.containsKey(from) && this.edges[from]?.contains(to) == true
-        }
+        fun hasEdge(edge: Edge) = this.hasEdge(edge.from, edge.to)
 
-        fun addEdge(from: Node, to: Node): Builder {
-            this.edges.getOrPut(from) {
+        fun hasEdge(from: Node, to: Node) = this.edges.containsKey(from) && this.edges[from]?.contains(to) == true
+
+        fun addEdge(from: Node, to: Node) = this.also {
+            edges.getOrPut(from) {
                 mutableSetOf()
             }.add(to)
-            return this
         }
 
-        fun build(): CallGraph {
-            return CallGraph(this.edges)
-        }
+        fun build() = CallGraph(this.edges, this.title)
 
     }
 
+}
+
+fun Iterable<CallGraph.Node>.toEdges(): Collection<CallGraph.Edge> {
+    val iterator = iterator()
+    if (!iterator.hasNext()) {
+        return emptyList()
+    }
+
+    val result = mutableListOf<CallGraph.Edge>()
+    var current = iterator.next()
+    while (iterator.hasNext()) {
+        val next = iterator.next()
+        result.add(CallGraph.Edge(current, next))
+        current = next
+    }
+
+    return result
 }

@@ -1,15 +1,18 @@
 package com.didiglobal.booster.transform.util
 
-import com.didiglobal.booster.kotlinx.parallelWalk
 import com.didiglobal.booster.kotlinx.redirect
 import com.didiglobal.booster.kotlinx.touch
+import com.didiglobal.booster.util.search
+import org.gradle.api.logging.Logging
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 
-fun nop(data: ByteArray): ByteArray = data
+private val logger = Logging.getLogger("transform")
 
 /**
  * Transform this file or directory to the output by the specified transformer
@@ -17,12 +20,12 @@ fun nop(data: ByteArray): ByteArray = data
  * @param output The output location
  * @param transformer The byte data transformer
  */
-fun File.transform(output: File, transformer: (ByteArray) -> ByteArray = ::nop) {
+fun File.transform(output: File, transformer: (ByteArray) -> ByteArray = { it -> it }) {
     when {
         isDirectory -> {
-            this.parallelWalk().filter { it != this && it.isFile }.forEach { file ->
-                val path = file.absolutePath.substring(this.absolutePath.length + java.io.File.separator.length)
-                file.transform(File(output, path), transformer)
+            val base = this.toURI()
+            this.search().forEach {
+                it.transform(File(output, base.relativize(it.toURI()).path), transformer)
             }
         }
         isFile -> {
@@ -34,15 +37,12 @@ fun File.transform(output: File, transformer: (ByteArray) -> ByteArray = ::nop) 
                                 dest.putNextEntry(JarEntry(entry.name))
                                 if (!entry.isDirectory) {
                                     when (entry.name.substringAfterLast('.', "")) {
-                                        "class" -> {
-                                            jar.getInputStream(entry).use { src ->
-                                                src.transform(transformer).redirect(dest)
-                                            }
+                                        "class" -> jar.getInputStream(entry).use { src ->
+                                            logger.info("Transforming ${this.absolutePath}!/${entry.name}")
+                                            src.transform(transformer).redirect(dest)
                                         }
-                                        else -> {
-                                            jar.getInputStream(entry).use { src ->
-                                                src.copyTo(dest)
-                                            }
+                                        else -> jar.getInputStream(entry).use { src ->
+                                            src.copyTo(dest)
                                         }
                                     }
                                 }
@@ -50,22 +50,37 @@ fun File.transform(output: File, transformer: (ByteArray) -> ByteArray = ::nop) 
                         }
                     }
                 }
-                "class" -> {
-                    inputStream().use {
-                        it.transform(transformer).redirect(output)
-                    }
+                "class" -> inputStream().use {
+                    logger.info("Transforming ${this.absolutePath}")
+                    it.transform(transformer).redirect(output)
                 }
-                else -> {
-                    this.copyTo(output, true)
-                }
+                else -> this.copyTo(output, true)
             }
         }
-        else -> {
-            TODO("Unexpected file: ${this.absolutePath}")
-        }
+        else -> TODO("Unexpected file: ${this.absolutePath}")
     }
 }
 
 fun InputStream.transform(transformer: (ByteArray) -> ByteArray): ByteArray {
-    return transformer(this.readBytes())
+    return transformer(readBytes())
+}
+
+private const val DEFAULT_BUFFER_SIZE = 8 * 1024
+
+private fun InputStream.readBytes(estimatedSize: Int = DEFAULT_BUFFER_SIZE): ByteArray {
+    val buffer = ByteArrayOutputStream(Math.max(estimatedSize, this.available()))
+    copyTo(buffer)
+    return buffer.toByteArray()
+}
+
+private fun InputStream.copyTo(out: OutputStream, bufferSize: Int = DEFAULT_BUFFER_SIZE): Long {
+    var bytesCopied: Long = 0
+    val buffer = ByteArray(bufferSize)
+    var bytes = read(buffer)
+    while (bytes >= 0) {
+        out.write(buffer, 0, bytes)
+        bytesCopied += bytes
+        bytes = read(buffer)
+    }
+    return bytesCopied
 }

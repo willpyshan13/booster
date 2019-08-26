@@ -3,6 +3,11 @@ package com.didiglobal.booster.kotlinx
 import java.util.ArrayList
 import java.util.Stack
 
+/**
+ * Represents a wildcard
+ *
+ * @author johnsonlee
+ */
 class Wildcard(private val pattern: String, private val ignoreCase: Boolean = false) {
 
     fun matches(text: String): Boolean {
@@ -65,6 +70,20 @@ class Wildcard(private val pattern: String, private val ignoreCase: Boolean = fa
         } while (backtrack.size > 0)
 
         return false
+    }
+
+    override fun hashCode() = this.pattern.hashCode()
+
+    override fun equals(other: Any?) = when {
+        other === this -> true
+        other is Wildcard -> other.pattern == this.pattern
+        else -> false
+    }
+
+    override fun toString() = this.pattern
+
+    companion object {
+        fun valueOf(pattern: String) = Wildcard(pattern)
     }
 
     private fun splitOnTokens(text: String): Array<String> {

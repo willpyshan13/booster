@@ -1,19 +1,22 @@
 package com.didiglobal.booster.gradle;
 
 import com.android.build.api.artifact.ArtifactType;
+import com.android.build.gradle.internal.publishing.AndroidArtifacts;
 import com.android.build.gradle.internal.scope.AnchorOutputType;
 import com.android.build.gradle.internal.scope.InternalArtifactType;
 import com.android.build.gradle.internal.scope.VariantScope;
+import com.android.sdklib.BuildToolInfo;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.android.build.gradle.internal.publishing.AndroidArtifacts.ArtifactScope.ALL;
+import static com.android.build.gradle.internal.publishing.AndroidArtifacts.ConsumedConfigType.RUNTIME_CLASSPATH;
 
 class VariantScopeV32 {
 
@@ -85,11 +88,12 @@ class VariantScopeV32 {
 
     @NotNull
     static Collection<File> getFinalArtifactFiles(@NotNull final VariantScope scope, @NotNull final ArtifactType type) {
-        try {
-            return scope.getArtifacts().getFinalArtifactFiles(type).getFiles();
-        } catch (final RuntimeException e) {
-            return Collections.emptyList();
-        }
+        return scope.getArtifacts().getFinalArtifactFiles(type).getFiles();
+    }
+
+    @NotNull
+    static BuildToolInfo getBuildTools(@NotNull final VariantScope scope) {
+        return scope.getGlobalScope().getAndroidBuilder().getBuildToolInfo();
     }
 
 }

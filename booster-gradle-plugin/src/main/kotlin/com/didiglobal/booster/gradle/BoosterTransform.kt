@@ -4,8 +4,10 @@ import com.android.build.api.transform.QualifiedContent
 import com.android.build.api.transform.Transform
 import com.android.build.api.transform.TransformInvocation
 import com.android.build.gradle.internal.pipeline.TransformManager
+import com.android.builder.model.AndroidProject
 import com.didiglobal.booster.kotlinx.file
 import com.didiglobal.booster.kotlinx.touch
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -22,26 +24,29 @@ abstract class BoosterTransform : Transform() {
     override fun getInputTypes(): MutableSet<QualifiedContent.ContentType> = TransformManager.CONTENT_CLASS
 
     final override fun transform(invocation: TransformInvocation?) {
-        if (invocation == null) {
-            return
-        }
+        invocation?.let {
+            BoosterTransformInvocation(it).apply {
+                dumpInputs(this)
 
-        BoosterTransformInvocation(invocation).apply {
-            dumpInputs(this)
+                if (isIncremental) {
+                    onPreTransform(this)
+                    doIncrementalTransform()
+                } else {
+                    buildDir.file(AndroidProject.FD_INTERMEDIATES, "transforms", "dexBuilder").let { dexBuilder ->
+                        if (dexBuilder.exists()) {
+                            dexBuilder.deleteRecursively()
+                        }
+                    }
+                    outputProvider.deleteAll()
+                    onPreTransform(this)
+                    doFullTransform()
+                }
 
-            if (isIncremental) {
-                onPreTransform(this)
-                doIncrementalTransform()
-            } else {
-                outputProvider.deleteAll()
-                onPreTransform(this)
-                doFullTransform()
+                this.onPostTransform(this)
+            }.executor.apply {
+                shutdown()
+                awaitTermination(1, TimeUnit.MINUTES)
             }
-
-            this.onPostTransform(this)
-        }.executor.apply {
-            shutdown()
-            awaitTermination(1, TimeUnit.MINUTES)
         }
     }
 
