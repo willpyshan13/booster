@@ -3,11 +3,15 @@ package com.didiglobal.booster.gradle
 import com.android.build.api.transform.QualifiedContent
 import com.android.build.api.transform.Transform
 import com.android.build.api.transform.TransformInvocation
+import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.internal.pipeline.TransformManager
 import com.android.builder.model.AndroidProject
 import com.didiglobal.booster.kotlinx.file
 import com.didiglobal.booster.kotlinx.touch
-import java.io.File
+import com.didiglobal.booster.transform.AbstractKlassPool
+import org.gradle.api.Project
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -15,7 +19,22 @@ import java.util.concurrent.TimeUnit
  *
  * @author johnsonlee
  */
-abstract class BoosterTransform : Transform() {
+abstract class BoosterTransform(val project: Project) : Transform() {
+
+    private val android: BaseExtension = project.getAndroid()
+
+    internal val executor: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+
+    private lateinit var androidKlassPool: AbstractKlassPool
+
+    init {
+        project.afterEvaluate {
+            androidKlassPool = object : AbstractKlassPool(android.bootClasspath) {}
+        }
+    }
+
+    val bootKlassPool: AbstractKlassPool
+        get() = androidKlassPool
 
     override fun getName() = "booster"
 
@@ -25,7 +44,7 @@ abstract class BoosterTransform : Transform() {
 
     final override fun transform(invocation: TransformInvocation?) {
         invocation?.let {
-            BoosterTransformInvocation(it).apply {
+            BoosterTransformInvocation(it, this).apply {
                 dumpInputs(this)
 
                 if (isIncremental) {

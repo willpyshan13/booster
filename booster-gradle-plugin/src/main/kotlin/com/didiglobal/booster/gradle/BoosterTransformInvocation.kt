@@ -16,25 +16,22 @@ import com.android.build.gradle.internal.publishing.AndroidArtifacts.ArtifactTyp
 import com.android.build.gradle.internal.publishing.AndroidArtifacts.ArtifactType.JAR
 import com.android.build.gradle.internal.publishing.AndroidArtifacts.ConsumedConfigType.RUNTIME_CLASSPATH
 import com.didiglobal.booster.kotlinx.ifNotEmpty
+import com.didiglobal.booster.transform.AbstractKlassPool
 import com.didiglobal.booster.transform.ArtifactManager
-import com.didiglobal.booster.transform.Klass
-import com.didiglobal.booster.transform.KlassPool
 import com.didiglobal.booster.transform.TransformContext
 import com.didiglobal.booster.transform.TransformListener
 import com.didiglobal.booster.transform.Transformer
 import com.didiglobal.booster.transform.util.transform
 import com.didiglobal.booster.util.search
 import java.io.File
-import java.net.URLClassLoader
 import java.util.ServiceLoader
-import java.util.concurrent.ForkJoinPool
 
 /**
  * Represents a delegate of TransformInvocation
  *
  * @author johnsonlee
  */
-internal class BoosterTransformInvocation(private val delegate: TransformInvocation) : TransformInvocation, TransformContext, TransformListener, ArtifactManager {
+internal class BoosterTransformInvocation(private val delegate: TransformInvocation, val transform: BoosterTransform) : TransformInvocation, TransformContext, TransformListener, ArtifactManager {
 
     /*
      * Preload transformers as List to fix NoSuchElementException caused by ServiceLoader in parallel mode
@@ -51,7 +48,7 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
 
     override val reportsDir: File = File(buildDir, "reports").also { it.mkdirs() }
 
-    override val executor = ForkJoinPool(Runtime.getRuntime().availableProcessors(), ForkJoinPool.defaultForkJoinWorkerThreadFactory, null, true)
+    override val executor = transform.executor
 
     override val bootClasspath = delegate.bootClasspath
 
@@ -61,7 +58,7 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
 
     override val artifacts = this
 
-    override val klassPool = KlassPoolImpl(runtimeClasspath)
+    override val klassPool: AbstractKlassPool = object : AbstractKlassPool(compileClasspath, transform.bootKlassPool) {}
 
     override val applicationId = delegate.applicationId
 
@@ -69,13 +66,9 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
 
     override val isDebuggable = delegate.variant.buildType.isDebuggable
 
-    override fun hasProperty(name: String): Boolean {
-        return project.hasProperty(name)
-    }
+    override fun hasProperty(name: String) = project.hasProperty(name)
 
-    override fun getProperty(name: String): String? {
-        return project.properties[name]?.toString()
-    }
+    override fun getProperty(name: String): String? = project.properties[name]?.toString()
 
     override fun getInputs(): MutableCollection<TransformInput> = delegate.inputs
 
@@ -98,16 +91,16 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
     }
 
     override fun get(type: String): Collection<File> = when (type) {
-        ArtifactManager.AAR                           -> variant.scope.getArtifactCollection(RUNTIME_CLASSPATH, ALL, AAR).artifactFiles.files
-        ArtifactManager.ALL_CLASSES                   -> variant.scope.allClasses
-        ArtifactManager.APK                           -> variant.scope.apk
-        ArtifactManager.JAR                           -> variant.scope.getArtifactCollection(RUNTIME_CLASSPATH, ALL, JAR).artifactFiles.files
-        ArtifactManager.JAVAC                         -> variant.scope.javac
-        ArtifactManager.MERGED_ASSETS                 -> variant.scope.mergedAssets
-        ArtifactManager.MERGED_RES                    -> variant.scope.mergedRes
-        ArtifactManager.MERGED_MANIFESTS              -> variant.scope.mergedManifests.search { SdkConstants.FN_ANDROID_MANIFEST_XML == it.name }
-        ArtifactManager.PROCESSED_RES                 -> variant.scope.processedRes.search { it.name.startsWith(SdkConstants.FN_RES_BASE) && it.name.endsWith(SdkConstants.EXT_RES) }
-        ArtifactManager.SYMBOL_LIST                   -> variant.scope.symbolList
+        ArtifactManager.AAR -> variant.scope.getArtifactCollection(RUNTIME_CLASSPATH, ALL, AAR).artifactFiles.files
+        ArtifactManager.ALL_CLASSES -> variant.scope.allClasses
+        ArtifactManager.APK -> variant.scope.apk
+        ArtifactManager.JAR -> variant.scope.getArtifactCollection(RUNTIME_CLASSPATH, ALL, JAR).artifactFiles.files
+        ArtifactManager.JAVAC -> variant.scope.javac
+        ArtifactManager.MERGED_ASSETS -> variant.scope.mergedAssets
+        ArtifactManager.MERGED_RES -> variant.scope.mergedRes
+        ArtifactManager.MERGED_MANIFESTS -> variant.scope.mergedManifests.search { SdkConstants.FN_ANDROID_MANIFEST_XML == it.name }
+        ArtifactManager.PROCESSED_RES -> variant.scope.processedRes.search { it.name.startsWith(SdkConstants.FN_RES_BASE) && it.name.endsWith(SdkConstants.EXT_RES) }
+        ArtifactManager.SYMBOL_LIST -> variant.scope.symbolList
         ArtifactManager.SYMBOL_LIST_WITH_PACKAGE_NAME -> variant.scope.symbolListWithPackageName
         else -> TODO("Unexpected type: $type")
     }
@@ -148,7 +141,7 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
             input.directoryInputs.parallelStream().forEach { dirInput ->
                 val base = dirInput.file.toURI()
                 dirInput.changedFiles.ifNotEmpty {
-                    it.forEach { file, status ->
+                    it.forEach { (file, status) ->
                         when (status) {
                             REMOVED -> file.delete()
                             ADDED, CHANGED -> {
@@ -171,57 +164,4 @@ internal class BoosterTransformInvocation(private val delegate: TransformInvocat
         }
     }
 
-    internal class KlassPoolImpl(private val classpath: Collection<File>) : KlassPool {
-
-        private val classLoader = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray())
-
-        private val klasses = mutableMapOf<String, Klass>()
-
-        override fun get(type: String): Klass {
-            val name = normalize(type)
-            return klasses.getOrDefault(name, findClass(name))
-        }
-
-        internal fun findClass(name: String): Klass {
-            return try {
-                LoadedKlass(this, Class.forName(name, false, classLoader)).also {
-                    klasses[name] = it
-                }
-            } catch (e: Throwable) {
-                DefaultKlass(name)
-            }
-        }
-
-        override fun toString(): String {
-            return "classpath: $classpath"
-        }
-
-    }
-
-    internal class DefaultKlass(name: String) : Klass {
-
-        override val qualifiedName: String = name
-
-        override fun isAssignableFrom(type: String) = false
-
-        override fun isAssignableFrom(klass: Klass) = klass.qualifiedName == this.qualifiedName
-
-    }
-
-    internal class LoadedKlass(val pool: KlassPoolImpl, val clazz: Class<out Any>) : Klass {
-
-        override val qualifiedName: String = clazz.name
-
-        override fun isAssignableFrom(type: String) = isAssignableFrom(pool.findClass(normalize(type)))
-
-        override fun isAssignableFrom(klass: Klass) = klass is LoadedKlass && clazz.isAssignableFrom(klass.clazz)
-
-    }
-
-}
-
-private fun normalize(type: String) = if (type.contains('/')) {
-    type.replace('/', '.')
-} else {
-    type
 }
