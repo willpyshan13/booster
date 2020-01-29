@@ -55,7 +55,7 @@ The best practise of using Booster is integrating the specific moudle to solve t
 
 ```groovy
 buildscript {
-    ext.booster_version = '1.2.1'
+    ext.booster_version = '1.3.0'
     repositories {
         google()
         mavenCentral()
@@ -112,7 +112,7 @@ Here are all the modules of Booster:
 - [booster-task-compression-cwebp](./booster-task-compression-cwebp) - 采用 cwebp 对资源进行压缩
 
   ```groovy
-  classpath "com.didiglobal.booster:booster-task-compression-pngquant:$booster_version"
+  classpath "com.didiglobal.booster:booster-task-compression-cwebp:$booster_version"
   ```
 
 - [booster-task-compression-pngquant](./booster-task-compression-pngquant) - 采用 pngquant 对资源进行压缩
@@ -222,7 +222,7 @@ Welcome to contribute by creating issues or sending pull requests. See [Contribu
 
 Welcome to join the community on [spectrum](https://spectrum.chat/booster).
 
-![Booster交流群](https://user-images.githubusercontent.com/2344882/71557791-269c8e80-2a86-11ea-8272-4c2d12b5219d.png)
+![Booster交流群](https://user-images.githubusercontent.com/2344882/72573685-78a43780-3901-11ea-826a-5abb021f1242.png)
 
 ## License
 

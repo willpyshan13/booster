@@ -40,6 +40,9 @@ val TransformInvocation.variant: BaseVariant
 val TransformInvocation.bootClasspath: Collection<File>
     get() = project.getAndroid<BaseExtension>().bootClasspath
 
+val TransformInvocation.isDataBindingEnabled: Boolean
+    get() = project.getAndroid<BaseExtension>().dataBinding.isEnabled
+
 /**
  * Returns the compile classpath of this transform invocation
  *

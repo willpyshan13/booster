@@ -2,9 +2,9 @@ package com.didiglobal.booster.transform.br.inline
 
 import com.didiglobal.booster.kotlinx.asIterable
 import com.didiglobal.booster.kotlinx.file
-import com.didiglobal.booster.kotlinx.ifNotEmpty
 import com.didiglobal.booster.kotlinx.touch
 import com.didiglobal.booster.transform.ArtifactManager.Companion.ALL_CLASSES
+import com.didiglobal.booster.transform.ArtifactManager.Companion.DATA_BINDING_DEPENDENCY_ARTIFACTS
 import com.didiglobal.booster.transform.TransformContext
 import com.didiglobal.booster.transform.asm.ClassTransformer
 import com.didiglobal.booster.util.search
@@ -17,6 +17,7 @@ import org.objectweb.asm.tree.LdcInsnNode
 import java.io.File
 import java.io.PrintWriter
 
+internal const val BR_FILE_EXT = "-br.bin"
 
 /**
  * Represents a class node transformer for constants shrinking
@@ -28,23 +29,24 @@ class BRInlineTransformer : ClassTransformer {
 
     private lateinit var symbols: SymbolList
     private lateinit var logger: PrintWriter
+    private lateinit var validClasses: Set<String>
 
     override fun onPreTransform(context: TransformContext) {
-        this.logger = context.reportsDir.file(Build.ARTIFACT).file(context.name).file("report.txt").touch().printWriter()
-
+        logger = context.reportsDir.file(Build.ARTIFACT).file(context.name).file("report.txt").touch().printWriter()
+        validClasses = context.findValidClasses()
         val allBR = context.findAllBR()
-        if (allBR.isEmpty()) {
+        symbols = allBR.find { it.second == context.appBR }?.first?.let {
+            SymbolList.from(it)
+        } ?: SymbolList.Builder().build()
+        if (symbols.isEmpty()) {
             "Inline BR symbols failed: BR.class doesn't exist or blank".apply {
                 logger_.error(this)
                 logger.println(this)
             }
             return
         }
-        val appBR = "${context.originalApplicationId.replace('.', '/')}/BR"
-        symbols = SymbolList.from(allBR.filter { it.second == appBR }.map { it.first }.single())
-
         // Remove all BR class files
-        allBR.ifNotEmpty { pairs ->
+        allBR.also { pairs ->
             val totalSize = allBR.map { it.first.length() }.sum()
             val maxWidth = allBR.map { it.second.length }.max()?.plus(10) ?: 10
 
@@ -63,7 +65,7 @@ class BRInlineTransformer : ClassTransformer {
     }
 
     override fun transform(context: TransformContext, klass: ClassNode): ClassNode {
-        if (this.symbols.isEmpty()) {
+        if (symbols.isEmpty()) {
             return klass
         }
         klass.replaceSymbolReferenceWithConstant()
@@ -74,13 +76,28 @@ class BRInlineTransformer : ClassTransformer {
         this.logger.close()
     }
 
+    private val TransformContext.appBR
+        get() = "${originalApplicationId.replace('.', '/')}/BR.class"
+
+    private fun TransformContext.findValidClasses(): Set<String> {
+        return if (isDataBindingEnabled) {
+            artifacts.get(DATA_BINDING_DEPENDENCY_ARTIFACTS)
+                    .filter { it.name.endsWith(BR_FILE_EXT) }
+                    .map { "${it.name.substringBefore("-").replace('.', '/')}/BR.class" }
+                    .plus(appBR)
+                    .toSet()
+        } else {
+            emptySet()
+        }
+    }
+
     private fun TransformContext.findAllBR(): List<Pair<File, String>> {
         return artifacts.get(ALL_CLASSES).map { classes ->
             val base = classes.toURI()
             classes.search { r ->
-                r.name == "BR.class"
+                base.relativize(r.toURI()).path in validClasses
             }.map { r ->
-                r to base.relativize(r.toURI()).path.substringBeforeLast(".class")
+                r to base.relativize(r.toURI()).path
             }
         }.flatten()
     }
@@ -92,7 +109,7 @@ class BRInlineTransformer : ClassTransformer {
             }.map {
                 it as FieldInsnNode
             }.filter {
-                "I" == it.desc && it.owner.substring(it.owner.lastIndexOf('/') + 1) == "BR"
+                "I" == it.desc && "${it.owner}.class" in validClasses
             }.forEach { field ->
                 // Replace int field with constant
                 try {

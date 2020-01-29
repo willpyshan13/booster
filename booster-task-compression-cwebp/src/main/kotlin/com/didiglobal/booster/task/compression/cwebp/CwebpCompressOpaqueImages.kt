@@ -1,8 +1,8 @@
 package com.didiglobal.booster.task.compression.cwebp
 
-import org.gradle.api.tasks.TaskAction
 import java.awt.image.BufferedImage
 import java.io.File
+import javax.imageio.IIOException
 import javax.imageio.ImageIO
 
 /**
@@ -18,8 +18,12 @@ internal open class CwebpCompressOpaqueImages : CwebpCompressImages() {
 
 internal fun File.hasNotAlpha() = !hasAlpha()
 
-internal fun File.hasAlpha() = ImageIO.read(this).let {
-    it.colorModel.hasAlpha() && it.hasAlpha()
+internal fun File.hasAlpha() = try {
+    ImageIO.read(this).let {
+        it.colorModel.hasAlpha() && it.hasAlpha()
+    }
+} catch (e: IIOException) {
+    throw IIOException("${e.message}: ${this.absolutePath}", e.cause)
 }
 
 internal fun BufferedImage.hasAlpha(): Boolean {

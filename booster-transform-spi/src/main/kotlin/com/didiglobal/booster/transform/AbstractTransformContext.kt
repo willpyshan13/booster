@@ -1,7 +1,6 @@
 package com.didiglobal.booster.transform
 
 import java.io.File
-import java.net.URLClassLoader
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -36,6 +35,8 @@ abstract class AbstractTransformContext(
     override val originalApplicationId = applicationId
 
     override val isDebuggable = true
+
+    override val isDataBindingEnabled = false
 
     override fun getProperty(name: String): String? = null
 

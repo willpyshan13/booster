@@ -81,6 +81,11 @@ interface TransformContext {
     val isDebuggable: Boolean
 
     /**
+     * is dataBinding enabled or not
+     */
+    val isDataBindingEnabled: Boolean
+
+    /**
      * Check if has the specified property. Generally, the property is equivalent to project property
      *
      * @param name the name of property
