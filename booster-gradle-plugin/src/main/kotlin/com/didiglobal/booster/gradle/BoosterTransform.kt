@@ -11,7 +11,6 @@ import com.didiglobal.booster.transform.AbstractKlassPool
 import com.didiglobal.booster.transform.Transformer
 import org.gradle.api.Project
 import java.util.ServiceLoader
-import java.util.concurrent.TimeUnit
 
 /**
  * Represents the transform base
@@ -42,6 +41,8 @@ abstract class BoosterTransform(val project: Project) : Transform() {
 
     override fun isIncremental() = true
 
+    override fun isCacheable() = true
+
     override fun getInputTypes(): MutableSet<QualifiedContent.ContentType> = TransformManager.CONTENT_CLASS
 
     override fun getScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf()
@@ -49,19 +50,12 @@ abstract class BoosterTransform(val project: Project) : Transform() {
     final override fun transform(invocation: TransformInvocation) {
         BoosterTransformInvocation(invocation, this).apply {
             if (isIncremental) {
-                onPreTransform(this)
                 doIncrementalTransform()
             } else {
                 buildDir.file(AndroidProject.FD_INTERMEDIATES, "transforms", "dexBuilder").deleteRecursively()
                 outputProvider?.deleteAll()
-                onPreTransform(this)
                 doFullTransform()
             }
-
-            this.onPostTransform(this)
-        }.executor.apply {
-            shutdown()
-            awaitTermination(1, TimeUnit.MINUTES)
         }
     }
 

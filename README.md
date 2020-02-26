@@ -55,7 +55,7 @@ The best practise of using Booster is integrating the specific moudle to solve t
 
 ```groovy
 buildscript {
-    ext.booster_version = '1.3.0'
+    ext.booster_version = '1.3.2'
     repositories {
         google()
         mavenCentral()
@@ -63,9 +63,9 @@ buildscript {
         maven { url 'https://oss.sonatype.org/content/repositories/public' }
     }
     dependencies {
-        classpath "com.didiglobal.booster:booster-gradle-plugin:$booster_version"
-        // figure out the features you really need, then choose the right module for integration
-        // 弄清楚真正需要的特性，然后从下面的模块列表中选择正确的模块进行集成
+        classpath "com.didiglobal.booster:booster-gradle-plugin:$booster_version" // ① 
+        // ② figure out the features you really need, then choose the right module for integration
+        // ② 弄清楚真正需要的特性，然后从下面的模块列表中选择正确的模块进行集成
     }
 }
 
@@ -77,6 +77,9 @@ allprojects {
         maven { url 'https://oss.sonatype.org/content/repositories/public' }
     }
 }
+
+apply plugin: 'com.android.application'
+apply plugin: 'com.didiglobal.booster' // ③
 ```
 
 Here are all the modules of Booster:
@@ -224,7 +227,7 @@ Welcome to contribute by creating issues or sending pull requests. See [Contribu
 
 Welcome to join the community on [spectrum](https://spectrum.chat/booster).
 
-![Booster交流群](https://user-images.githubusercontent.com/2344882/73631511-26e70580-4694-11ea-86cc-d0f65d08f5dd.png)
+![Booster交流群](https://user-images.githubusercontent.com/2344882/74929197-fc2bd980-5415-11ea-859c-a33f5e350cfa.png)
 
 ## License
 
