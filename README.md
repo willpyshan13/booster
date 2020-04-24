@@ -55,7 +55,7 @@ The best practise of using Booster is integrating the specific moudle to solve t
 
 ```groovy
 buildscript {
-    ext.booster_version = '1.3.2'
+    ext.booster_version = '1.6.0'
     repositories {
         google()
         mavenCentral()
@@ -84,12 +84,40 @@ apply plugin: 'com.didiglobal.booster' // ③
 
 Here are all the modules of Booster:
 
-### Performance
+### Common
 
-- [booster-transform-lint](./booster-transform-lint) - 性能瓶颈检测
+- [booster-aapt2](./booster-aapt2) - AAPT2 相关 API
 
   ```groovy
-  classpath "com.didiglobal.booster:booster-transform-lint:$booster_version"
+  implementation "com.didiglobal.booster:booster-aapt2:$booster_version"
+  ```
+
+- [booster-api](./booster-api) - Booster 插件开发 API
+
+  this module contains both [booster-transform-spi](./booster-transform-spi) and [booster-task-spi](./booster-task-spi)
+
+  ```groovy
+  implementation "com.didiglobal.booster:booster-api:$booster_version"
+  ```
+
+- [booster-cha](./booster-cha) - Class Hierarchy Analysis API
+
+  ```groovy
+  implementation "com.didiglobal.booster:booster-cha:$booster_version"
+  ```
+
+- [booster-command](./booster-command) - SPI for external command discovery
+
+  ```groovy
+  implementation "com.didiglobal.booster:booster-command:$booster_version"
+  ```
+
+### Performance
+
+- [booster-task-analyser](./booster-task-analyser) - 静态分析工具
+
+  ```groovy
+  classpath "com.didiglobal.booster:booster-task-analyser:$booster_version"
   ```
 
 - [booster-transform-thread](./booster-transform-thread) - 多线程优化
@@ -148,12 +176,6 @@ Here are all the modules of Booster:
 
   ```groovy
   classpath "com.didiglobal.booster:booster-transform-br-inline:$booster_version"
-  ```
-
-- [booster-transform-verifier](./booster-transform-verifier) - Bytecode 校验
-
-  ```groovy
-  classpath "com.didiglobal.booster:booster-transform-verifier:$booster_version"
   ```
 
 ### System Bug
@@ -225,9 +247,7 @@ Welcome to contribute by creating issues or sending pull requests. See [Contribu
 
 ## Community
 
-Welcome to join the community on [spectrum](https://spectrum.chat/booster).
-
-![Booster交流群](https://user-images.githubusercontent.com/2344882/74929197-fc2bd980-5415-11ea-859c-a33f5e350cfa.png)
+![Booster交流群](https://user-images.githubusercontent.com/2344882/77068493-aef55480-6a21-11ea-877e-791b13dfe48b.png)
 
 ## License
 

@@ -5,24 +5,23 @@ import com.android.build.api.transform.Transform
 import com.android.build.api.transform.TransformInvocation
 import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.internal.pipeline.TransformManager
-import com.android.builder.model.AndroidProject
-import com.didiglobal.booster.kotlinx.file
+import com.android.build.gradle.internal.pipeline.TransformManager.SCOPE_FULL_PROJECT
+import com.didiglobal.booster.build.BoosterServiceLoader
 import com.didiglobal.booster.transform.AbstractKlassPool
 import com.didiglobal.booster.transform.Transformer
 import org.gradle.api.Project
-import java.util.ServiceLoader
 
 /**
  * Represents the transform base
  *
  * @author johnsonlee
  */
-abstract class BoosterTransform(val project: Project) : Transform() {
+open class BoosterTransform(val project: Project) : Transform() {
 
     /*
      * Preload transformers as List to fix NoSuchElementException caused by ServiceLoader in parallel mode
      */
-    internal val transformers = ServiceLoader.load(Transformer::class.java, javaClass.classLoader).toList()
+    internal val transformers = BoosterServiceLoader.load(Transformer::class.java, javaClass.classLoader).toList()
 
     private val android: BaseExtension = project.getAndroid()
 
@@ -45,14 +44,29 @@ abstract class BoosterTransform(val project: Project) : Transform() {
 
     override fun getInputTypes(): MutableSet<QualifiedContent.ContentType> = TransformManager.CONTENT_CLASS
 
-    override fun getScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf()
+    override fun getScopes(): MutableSet<in QualifiedContent.Scope> = when {
+        transformers.isEmpty() -> mutableSetOf()
+        project.plugins.hasPlugin("com.android.library") -> SCOPE_PROJECT
+        project.plugins.hasPlugin("com.android.application") -> SCOPE_FULL_PROJECT
+        project.plugins.hasPlugin("com.android.dynamic-feature") -> SCOPE_FULL_WITH_FEATURES
+        else -> TODO("Not an Android project")
+    }
+
+    override fun getReferencedScopes(): MutableSet<in QualifiedContent.Scope> = when {
+        transformers.isEmpty() -> when {
+            project.plugins.hasPlugin("com.android.library") -> SCOPE_PROJECT
+            project.plugins.hasPlugin("com.android.application") -> SCOPE_FULL_PROJECT
+            project.plugins.hasPlugin("com.android.dynamic-feature") -> SCOPE_FULL_WITH_FEATURES
+            else -> TODO("Not an Android project")
+        }
+        else -> super.getReferencedScopes()
+    }
 
     final override fun transform(invocation: TransformInvocation) {
         BoosterTransformInvocation(invocation, this).apply {
             if (isIncremental) {
                 doIncrementalTransform()
             } else {
-                buildDir.file(AndroidProject.FD_INTERMEDIATES, "transforms", "dexBuilder").deleteRecursively()
                 outputProvider?.deleteAll()
                 doFullTransform()
             }
