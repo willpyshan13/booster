@@ -71,11 +71,13 @@ The best practise of using Booster is integrating the specific moudle to solve t
 
 ```groovy
 buildscript {
-    ext.booster_version = '2.3.1'
+    ext.booster_version = '2.3.2'
     repositories {
         google()
         mavenCentral()
         jcenter()
+        
+        // OPTIONAL If you want to use SNAPSHOT version, sonatype repository is required.
         maven { url 'https://oss.sonatype.org/content/repositories/public' }
     }
     dependencies {
@@ -90,6 +92,8 @@ allprojects {
         google()
         mavenCentral()
         jcenter()
+        
+        // OPTIONAL If you want to use SNAPSHOT version, sonatype repository is required.
         maven { url 'https://oss.sonatype.org/content/repositories/public' }
     }
 }
