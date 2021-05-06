@@ -1,6 +1,7 @@
 package com.didiglobal.booster.android.gradle.v4_1
 
 import com.android.build.api.artifact.Artifact
+import com.android.build.api.artifact.ArtifactType
 import com.android.build.api.artifact.impl.ArtifactsImpl
 import com.android.build.api.component.impl.ComponentPropertiesImpl
 import com.android.build.api.transform.Context
@@ -31,6 +32,7 @@ import java.util.TreeMap
 
 @Suppress("UnstableApiUsage")
 private val ARTIFACT_TYPES = arrayOf(
+        ArtifactType::class,
         AnchorOutputType::class,
         InternalArtifactType::class
 ).map {
@@ -142,14 +144,10 @@ object V41 : AGPInterface {
         get() = getFinalArtifactFiles(InternalArtifactType.AAR)
 
     override val BaseVariant.apk: Collection<File>
-        get() = getFinalArtifactFiles(InternalArtifactType.APK)
+        get() = getFinalArtifactFiles(ArtifactType.APK)
 
     override val BaseVariant.mergedManifests: Collection<File>
-        get() = when (this) {
-            is ApplicationVariant -> getFinalArtifactFiles(InternalArtifactType.MERGED_MANIFESTS)
-            is LibraryVariant -> getFinalArtifactFiles(InternalArtifactType.LIBRARY_MANIFEST)
-            else -> TODO("Unsupported variant type: $variantType")
-        }
+        get() = getFinalArtifactFiles(ArtifactType.MERGED_MANIFEST)
 
     override val BaseVariant.mergedRes: Collection<File>
         get() = getFinalArtifactFiles(InternalArtifactType.MERGED_RES)

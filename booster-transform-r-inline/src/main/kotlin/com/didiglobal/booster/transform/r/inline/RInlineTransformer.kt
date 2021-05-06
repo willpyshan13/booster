@@ -3,7 +3,6 @@ package com.didiglobal.booster.transform.r.inline
 import com.didiglobal.booster.kotlinx.Wildcard
 import com.didiglobal.booster.kotlinx.asIterable
 import com.didiglobal.booster.kotlinx.execute
-import com.didiglobal.booster.kotlinx.file
 import com.didiglobal.booster.kotlinx.ifNotEmpty
 import com.didiglobal.booster.kotlinx.touch
 import com.didiglobal.booster.transform.ArtifactManager.Companion.MERGED_RES
@@ -45,9 +44,11 @@ class RInlineTransformer : ClassTransformer {
         ConcurrentHashMap<String, Int>()
     }
 
+    override val name: String = Build.ARTIFACT
+
     override fun onPreTransform(context: TransformContext) {
         this.appPackage = context.originalApplicationId.replace('.', '/')
-        this.logger = context.reportsDir.file(Build.ARTIFACT).file(context.name).file("report.txt").touch().printWriter()
+        this.logger = getReport(context, "report.txt").touch().printWriter()
         this.symbols = SymbolList.from(context.artifacts.get(SYMBOL_LIST).single())
         this.appRStyleable = "$appPackage/$R_STYLEABLE"
         this.ignores = context.getProperty(PROPERTY_IGNORES, "").trim().split(',').map(Wildcard.Companion::valueOf).toSet()
@@ -59,7 +60,7 @@ class RInlineTransformer : ClassTransformer {
         }
 
         val retainedSymbols: Set<String>
-        val classpath = context.compileClasspath.map { it.absolutePath }
+        val classpath = context.compileClasspath.map { it.canonicalPath}
         if (classpath.any { it.contains(PREFIX_SUPPORT_CONSTRAINT_LAYOUT) || it.contains(PREFIX_JETPACK_CONSTRAINT_LAYOUT) }) {
             // Find symbols that should be retained
             retainedSymbols = context.findRetainedSymbols()
