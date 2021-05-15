@@ -55,6 +55,11 @@ interface TransformContext {
     val artifacts: ArtifactManager
 
     /**
+     * The original dependencies, may be same to [compileClasspath]
+     */
+    val dependencies: Collection<String>
+
+    /**
      * The class pool
      */
     val klassPool: KlassPool
